@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import { pool } from './db.js';
 import { getUsers, createUser, getUserById, updateUser, deleteUser } from './controllers/users.js';
 import { getTasks, createTask, getTaskById, getUserTaskById, updateTask,
@@ -8,6 +9,7 @@ const app = express();
 const port = 3000;
 
 app.use(express.json());
+app.use(cors());
 
 pool.getConnection()
     .then(connection => {
