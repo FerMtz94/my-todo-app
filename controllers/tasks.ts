@@ -3,15 +3,6 @@ import type { Request, Response } from 'express';
 import fs from 'fs';
 
 export const getTasks = async (req: Request, res: Response) => {
-  const tasksPath = './models/tasks.sql';
-  const tasksScript = fs.readFileSync(tasksPath, 'utf-8');
-
-  try {
-    await pool.query(tasksScript);
-  } catch (error) {
-    console.error(error);
-  }
-
   try {
     const { user_id } = req.params;
     let sql = 'SELECT * FROM tasks WHERE user_id = ?;';

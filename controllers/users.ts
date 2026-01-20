@@ -3,15 +3,6 @@ import type { Request, Response } from 'express';
 import fs from 'fs';
 
 export const getUsers = async (req: Request, res: Response) => {
-    const usersPath = './models/users.sql';
-    const usersScript = fs.readFileSync(usersPath, 'utf-8');
-
-    try {
-        await pool.query(usersScript)
-    } catch (error) {
-        console.error(error);
-    }
-
     try {
         const [rows, fields] = await pool.query('SELECT * FROM users;');
         return res.status(200).json(rows);
