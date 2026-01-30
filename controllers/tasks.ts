@@ -15,7 +15,7 @@ export const getTasks = async (req: Request, res: Response) => {
 };
 
 export const createTask = async (req: Request, res: Response) => {
-  const { user_id, title, description, due_date } = req.body;
+  const { user_id, title, description, due_date } = JSON.parse(req.body);
 
   if (!user_id || !title) {
     return res.status(400).json({ error: 'user_id and title are required' });
