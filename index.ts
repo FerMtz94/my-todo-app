@@ -8,7 +8,7 @@ import { getTasks, createTask, getTaskById, getUserTaskById, updateTask,
 const app = express();
 const port = 3000;
 const corsOptions = {
-  origin: ['https://my-todo-client-mu.vercel.app/'],
+  origin: ['https://my-todo-client-mu.vercel.app/*'],
   optionsSuccessStatus: 200
 }
 
