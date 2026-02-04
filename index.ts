@@ -7,7 +7,7 @@ import { getTasks, createTask, getTaskById, getUserTaskById, updateTask,
 
 const app = express();
 const port = 3000;
-const allowedOriginsRegexp = /https:\/\/my-todo-client-mu.vercel\.app.*/;
+const allowedOriginsRegexp: RegExp[] = [/https:\/\/my-todo-client-mu.vercel\.app.*/, /.*localhost:5173.*/];
 const corsOptions = {
   origin: allowedOriginsRegexp,
   optionsSuccessStatus: 200
