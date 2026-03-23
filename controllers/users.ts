@@ -1,12 +1,13 @@
+import { neon } from "@neondatabase/serverless";
 import type { Request, Response } from "express";
-import { pool } from "../db.js";
 
 export const getUsers = async (_req: Request, res: Response) => {
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 	try {
-		const [rows, _fields] = await pool.query("SELECT * FROM users;");
+		const rows = await sql`SELECT * FROM users;`;
 		return res.status(200).json(rows);
-	} catch (_error) {
-		return res.status(500).json({ error: "Internal Server Error" });
+	} catch (error) {
+		return res.status(500).json({ error });
 	}
 };
 
@@ -19,16 +20,12 @@ export const createUser = async (req: Request, res: Response) => {
 			.json({ error: "username, email and password_hash are required" });
 	}
 
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
+
 	try {
-		const [result] = await pool.query(
-			"INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
-			[username, email, password_hash],
-		);
-		const insertId = (result as any).insertId;
-		const [rows] = await pool.query("SELECT * FROM users WHERE id = ?", [
-			insertId,
-		]);
-		return res.status(201).json((rows as any)[0]);
+		const [result] =
+			await sql`INSERT INTO users (username, email, password_hash) VALUES (${username}, ${email}, ${password_hash})`;
+		return res.status(201).json({ user_id: result.insertId });
 	} catch (error: any) {
 		if (error && error.code === "ER_DUP_ENTRY") {
 			return res
@@ -42,17 +39,19 @@ export const createUser = async (req: Request, res: Response) => {
 
 export const getUserById = async (req: Request, res: Response) => {
 	const { id } = req.params;
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 
 	try {
-		const [rows] = await pool.query("SELECT * FROM users WHERE id = ?", [id]);
-		const user = (rows as any)[0];
+		const [rows] =
+			await sql`SELECT id, username, email FROM users WHERE id = ${id}`;
+		const user = (rows as unknown[])[0];
 		if (!user) {
 			return res.status(404).json({ error: "User not found" });
 		}
 		return res.status(200).json(user);
 	} catch (error) {
 		console.error(error);
-		return res.status(500).json({ error: "Internal Server Error" });
+		return res.status(500).json({ error });
 	}
 };
 
@@ -64,38 +63,39 @@ export const updateUser = async (req: Request, res: Response) => {
 	const values: any[] = [];
 
 	if (username) {
-		fields.push("username = ?");
+		fields.push(`username = ${username}`);
 		values.push(username);
 	}
 	if (email) {
-		fields.push("email = ?");
+		fields.push(`email = ${email}`);
 		values.push(email);
 	}
 	if (password_hash) {
-		fields.push("password_hash = ?");
+		fields.push(`password_hash = ${password_hash}`);
 		values.push(password_hash);
 	}
 
 	if (fields.length === 0) {
-		return res
-			.status(400)
-			.json({
-				error:
-					"At least one field (username, email, password_hash) is required to update",
-			});
+		return res.status(400).json({
+			error:
+				"At least one field (username, email, password_hash) is required to update",
+		});
 	}
+
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 
 	try {
 		values.push(id);
-		const sql = `UPDATE users SET ${fields.join(", ")} WHERE id = ?`;
-		const [result] = await pool.query(sql, values);
-		const affectedRows = (result as any).affectedRows;
+		const [result] =
+			await sql`UPDATE users SET ${fields.join(", ")} WHERE id = ${id}`;
+		const affectedRows = (result as unknown & { affectedRows: number })
+			.affectedRows;
 		if (!affectedRows) {
 			return res.status(404).json({ error: "User not found" });
 		}
 
-		const [rows] = await pool.query("SELECT * FROM users WHERE id = ?", [id]);
-		return res.status(200).json((rows as any)[0]);
+		const [rows] = await sql`SELECT * FROM users WHERE id = ${id}`;
+		return res.status(200).json((rows as unknown[])[0]);
 	} catch (error: any) {
 		if (error && error.code === "ER_DUP_ENTRY") {
 			return res
@@ -109,10 +109,12 @@ export const updateUser = async (req: Request, res: Response) => {
 
 export const deleteUser = async (req: Request, res: Response) => {
 	const { id } = req.params;
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 
 	try {
-		const [result] = await pool.query("DELETE FROM users WHERE id = ?", [id]);
-		const affectedRows = (result as any).affectedRows;
+		const [result] = await sql`DELETE FROM users WHERE id = ${id}`;
+		const affectedRows = (result as unknown & { affectedRows: number })
+			.affectedRows;
 		if (!affectedRows) {
 			return res.status(404).json({ error: "User not found" });
 		}

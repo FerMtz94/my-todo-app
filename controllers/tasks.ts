@@ -1,15 +1,14 @@
+import { neon } from "@neondatabase/serverless";
 import type { Request, Response } from "express";
-import { pool } from "../db.js";
 
 export const getTasks = async (req: Request, res: Response) => {
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 	try {
 		const { user_id } = req.params;
-		const sql = "SELECT * FROM tasks WHERE user_id = ?;";
-		const [rows] = await pool.query(sql, [user_id]);
+		const rows = await sql`SELECT * FROM tasks WHERE user_id = ${user_id}`;
 		return res.status(200).json(rows);
 	} catch (error) {
-		console.error(error);
-		return res.status(500).json({ error: "Internal Server Error" });
+		return res.status(500).json({ error });
 	}
 };
 
@@ -20,28 +19,17 @@ export const createTask = async (req: Request, res: Response) => {
 		return res.status(400).json({ error: "user_id and title are required" });
 	}
 
-	try {
-		const [userRows] = await pool.query("SELECT * FROM users WHERE id = ?", [
-			user_id,
-		]);
-		const user = (userRows as any)[0];
-		if (!user) {
-			return res.status(400).json({ error: "User id does not exist" });
-		}
-	} catch (_error: any) {
-		return res.status(500).json({ error: "Internal Server Error" });
-	}
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 
 	try {
-		const [result] = await pool.query(
-			"INSERT INTO tasks (user_id, title, description, is_completed, due_date) VALUES (?, ?, ?, ?, ?)",
-			[user_id, title, description || null, false, due_date || null],
-		);
+		const [result] = await sql`
+			INSERT INTO tasks (user_id, title, description, is_completed, due_date)
+			VALUES (${user_id}, ${title}, ${description || null}, false, ${due_date || null})
+			RETURNING id
+		`;
 
-		const insertId = (result as any).insertId;
-		return res.status(201).json({ task_id: insertId });
+		return res.status(201).json({ id: result.id });
 	} catch (error: any) {
-		console.error(error);
 		if (
 			error &&
 			(error.code === "ER_NO_REFERENCED_ROW_2" ||
@@ -51,71 +39,65 @@ export const createTask = async (req: Request, res: Response) => {
 				.status(400)
 				.json({ error: "Invalid user_id: user does not exist" });
 		}
-		return res.status(500).json({ error: "Internal Server Error" });
+		return res.status(500).json({ error });
 	}
 };
 
 export const getTaskById = async (req: Request, res: Response) => {
 	const { id } = req.params;
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 
 	try {
-		const [rows] = await pool.query("SELECT * FROM tasks WHERE id = ?", [id]);
+		const [rows] = await sql`SELECT * FROM tasks WHERE id = ${id}`;
 		const task = (rows as any)[0];
 		if (!task) {
 			return res.status(404).json({ error: "Task not found" });
 		}
 		return res.status(200).json(task);
 	} catch (error) {
-		console.error(error);
-		return res.status(500).json({ error: "Internal Server Error" });
+		return res.status(500).json({ error });
 	}
 };
 
 export const getUserTaskById = async (req: Request, res: Response) => {
 	const { user_id, id } = req.params;
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 
 	try {
-		const [rows] = await pool.query(
-			"SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-			[id, user_id],
-		);
+		const rows = await sql`
+			SELECT * FROM tasks WHERE id = ${id} AND user_id = ${user_id}
+		`;
 		const task = (rows as any)[0];
 		if (!task) {
 			return res.status(404).json({ error: "Task not found" });
 		}
 		return res.status(200).json(task);
 	} catch (error) {
-		console.error(error);
-		return res.status(500).json({ error: "Internal Server Error" });
+		return res.status(500).json({ error });
 	}
 };
 
 export const updateTask = async (req: Request, res: Response) => {
 	const { id } = req.params;
 	const { user_id, title, description, is_completed, due_date } = req.body;
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 
 	const fields: string[] = [];
-	const values: any[] = [];
 
 	if (user_id !== undefined) {
-		fields.push("user_id = ?");
-		values.push(user_id);
+		fields.push(`user_id = ${user_id}`);
 	}
 	if (title !== undefined) {
-		fields.push("title = ?");
-		values.push(title);
+		fields.push(`title = ${title}`);
 	}
 	if (description !== undefined) {
-		fields.push("description = ?");
-		values.push(description);
+		fields.push(`description = ${description || null}`);
 	}
 	if (is_completed !== undefined) {
-		fields.push("is_completed = ?");
-		values.push(is_completed);
+		fields.push(`is_completed = ${is_completed}`);
 	}
 	if (due_date !== undefined) {
-		fields.push("due_date = ?");
-		values.push(due_date);
+		fields.push(`due_date = ${due_date || null}`);
 	}
 
 	if (fields.length === 0) {
@@ -125,18 +107,17 @@ export const updateTask = async (req: Request, res: Response) => {
 	}
 
 	try {
-		values.push(id);
-		const sql = `UPDATE tasks SET ${fields.join(", ")} WHERE id = ?`;
-		const [result] = await pool.query(sql, values);
+		const [result] = await sql`
+			UPDATE tasks SET ${fields.join(", ")} WHERE id = ${id}
+		`;
 		const affected = (result as any).affectedRows;
 		if (!affected) {
 			return res.status(404).json({ error: "Task not found" });
 		}
 
-		const [rows] = await pool.query("SELECT * FROM tasks WHERE id = ?", [id]);
+		const [rows] = await sql`SELECT * FROM tasks WHERE id = ${id}`;
 		return res.status(200).json((rows as any)[0]);
 	} catch (error: any) {
-		console.error(error);
 		if (
 			error &&
 			(error.code === "ER_NO_REFERENCED_ROW_2" ||
@@ -146,32 +127,28 @@ export const updateTask = async (req: Request, res: Response) => {
 				.status(400)
 				.json({ error: "Invalid user_id: user does not exist" });
 		}
-		return res.status(500).json({ error: "Internal Server Error" });
+		return res.status(500).json({ error });
 	}
 };
 
 export const updateUserTask = async (req: Request, res: Response) => {
 	const { user_id, id } = req.params;
 	const { title, description, is_completed, due_date } = req.body;
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 
 	const fields: string[] = [];
-	const values: any[] = [];
 
 	if (title !== undefined) {
-		fields.push("title = ?");
-		values.push(title);
+		fields.push(`title = ${title}`);
 	}
 	if (description !== undefined) {
-		fields.push("description = ?");
-		values.push(description);
+		fields.push(`description = ${description || null}`);
 	}
 	if (is_completed !== undefined) {
-		fields.push("is_completed = ?");
-		values.push(is_completed);
+		fields.push(`is_completed = ${is_completed}`);
 	}
 	if (due_date !== undefined) {
-		fields.push("due_date = ?");
-		values.push(due_date);
+		fields.push(`due_date = ${due_date || null}`);
 	}
 
 	if (fields.length === 0) {
@@ -181,19 +158,17 @@ export const updateUserTask = async (req: Request, res: Response) => {
 	}
 
 	try {
-		values.push(id, user_id);
-		const sql = `UPDATE tasks SET ${fields.join(", ")} WHERE id = ? AND user_id = ?`;
-		const [result] = await pool.query(sql, values);
+		const [result] = await sql`
+			UPDATE tasks SET ${fields.join(", ")} WHERE id = ${id} AND user_id = ${user_id}
+		`;
 		const affected = (result as any).affectedRows;
 		if (!affected) {
 			return res.status(404).json({ error: "Task not found" });
 		}
 
-		const [rows] = await pool.query(
-			"SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-			[id, user_id],
-		);
-		return res.status(200).json((rows as any)[0]);
+		const [rows] =
+			await sql`SELECT * FROM tasks WHERE id = ${id} AND user_id = ${user_id}`;
+		return res.status(200).json((rows as unknown[])[0]);
 	} catch (error: any) {
 		if (
 			error &&
@@ -210,41 +185,43 @@ export const updateUserTask = async (req: Request, res: Response) => {
 
 export const deleteTask = async (req: Request, res: Response) => {
 	const { id } = req.params;
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 
 	try {
-		const [result] = await pool.query("DELETE FROM tasks WHERE id = ?", [id]);
-		const affected = (result as any).affectedRows;
-		if (!affected) {
+		const [result] = await sql`
+			WITH deleted AS (
+				DELETE FROM tasks WHERE id = ${id}
+				RETURNING *
+			)
+			SELECT COUNT(*) AS affectedRows FROM deleted;
+		`;
+		const affected: number = (result as any).affectedRows;
+		if (affected < 1) {
 			return res.status(404).json({ error: "Task not found" });
 		}
 		return res.status(200).json({ message: "Task deleted successfully" });
 	} catch (error) {
-		console.error(error);
-		return res.status(500).json({ error: "Internal Server Error" });
+		return res.status(500).json({ error });
 	}
 };
 
-export const deleteUserTasks = async (req: Request, _res: Response) => {
-	const { user_id } = req.params;
-
-	// TODO: Implement the rest
+export const deleteUserTasks = async (_req: Request, _res: Response) => {
+	throw new Error("This method is not implemented yet");
 };
 
 export const deleteUserTask = async (req: Request, res: Response) => {
 	const { user_id, id } = req.params;
+	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 
 	try {
-		const [result] = await pool.query(
-			"DELETE FROM tasks WHERE id = ? AND user_id = ?",
-			[id, user_id],
-		);
+		const [result] =
+			await sql`DELETE FROM tasks WHERE id = ${id} AND user_id = ${user_id}`;
 		const affected = (result as any).affectedRows;
 		if (!affected) {
 			return res.status(404).json({ error: "Task not found" });
 		}
 		return res.status(200).json({ message: "Task deleted successfully" });
 	} catch (error) {
-		console.error(error);
-		return res.status(500).json({ error: "Internal Server Error" });
+		return res.status(500).json({ error });
 	}
 };

@@ -18,13 +18,13 @@ import {
 	getUsers,
 	updateUser,
 } from "./controllers/users.js";
-import { pool } from "./db.js";
 
 const app = express();
 const port = 3000;
 const allowedOriginsRegexp: RegExp[] = [
 	/https:\/\/my-todo-client-mu.vercel\.app.*/,
 	/.*localhost:5173.*/,
+	/.*/,
 ];
 const corsOptions = {
 	origin: allowedOriginsRegexp,
@@ -33,16 +33,6 @@ const corsOptions = {
 
 app.use(express.json());
 app.use(cors(corsOptions));
-
-pool
-	.getConnection()
-	.then((connection) => {
-		console.log("Connected to MySQL database successfully!");
-		connection.release(); // Release the connection immediately after testing
-	})
-	.catch((err) => {
-		console.error("Database connection failed:", err.message);
-	});
 
 app.get("/", (_req, res) => {
 	res.send("Hello World!");
