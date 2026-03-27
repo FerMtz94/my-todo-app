@@ -42,7 +42,7 @@ export const getUserById = async (req: Request, res: Response) => {
 	const sql = neon(process.env.TODO_APP_DB_DATABASE_URL_UNPOOLED || "");
 
 	try {
-		const [rows] =
+		const rows =
 			await sql`SELECT id, username, email FROM users WHERE id = ${id}`;
 		const user = (rows as unknown[])[0];
 		if (!user) {
